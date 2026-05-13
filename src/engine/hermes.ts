@@ -157,6 +157,61 @@ export class HermesAgent {
   }
 
   // ─────────────────────────────────────────────
+  // 高层功能：研究标题生成
+  // ─────────────────────────────────────────────
+
+  /**
+   * 让蜂后基于用户输入总结出简洁的标题和精炼的描述
+   */
+  async summarizeResearchMeta(
+    userInput: string,
+    existingFindings?: Finding[],
+  ): Promise<{ title: string; objective: string }> {
+    const hasFindings = existingFindings && existingFindings.length > 0;
+
+    const findingsContext = hasFindings
+      ? `\n\n已有研究成果（${existingFindings.length} 条情报）：\n${existingFindings.slice(0, 10).map(f => `- ${f.title}: ${f.summary.slice(0, 80)}`).join("\n")}`
+      : "";
+
+    const systemPrompt = `你是 BeeSearch 研究系统的蜂后。请为一项研究任务生成简洁的标题和精炼的目标描述。
+
+规则：
+1. **标题 (title)**：用 8-20 个字概括研究核心主题，像论文标题一样简洁有力，不要包含标点符号
+2. **目标 (objective)**：用 1-2 句话（50字以内）精炼概括研究要解答的核心问题和方向
+3. 不要机械截取用户的原文，要理解用户意图后重新概括
+4. 如果有已有研究成果，标题和描述应该反映研究的最新理解${hasFindings ? "（可能与最初用户输入有偏差，以实际研究方向为准）" : ""}
+
+输出严格 JSON（不要代码块包裹）:
+{
+  "title": "研究标题",
+  "objective": "研究目标描述"
+}
+
+直接输出 JSON，不要其他文字。`;
+
+    const messages: HermesMessage[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `用户输入：${userInput}${findingsContext}` },
+    ];
+
+    try {
+      const response = await this.chat(messages);
+      const parsed = JSON.parse(this.extractJSON(response));
+      return {
+        title: String(parsed.title || "").slice(0, 30) || userInput.slice(0, 20),
+        objective: String(parsed.objective || "").slice(0, 100) || userInput.slice(0, 50),
+      };
+    } catch {
+      // Fallback: 简单截取
+      const rawTitle = userInput.split("\n")[0].trim();
+      return {
+        title: rawTitle.length > 20 ? rawTitle.slice(0, 20) + "…" : rawTitle,
+        objective: userInput.slice(0, 100),
+      };
+    }
+  }
+
+  // ─────────────────────────────────────────────
   // 高层功能：研究规划
   // ─────────────────────────────────────────────
 
@@ -670,50 +725,31 @@ ${roundSummaries.map(r => `第${r.round}轮: ${r.keyDiscoveries.join("; ")}`).jo
 
     const rawReport = await this.chat(messages);
     
-    // 确保返回的是 HTML — 如果 AI 意外输出了代码块包裹，去掉
-    let html = rawReport.trim();
-    if (html.startsWith("```html")) {
-      html = html.slice(7);
-    } else if (html.startsWith("```")) {
-      html = html.slice(3);
-    }
-    if (html.endsWith("```")) {
-      html = html.slice(0, -3);
-    }
-    html = html.trim();
+    // 从 AI 输出中提取 HTML 报告 —— 处理多种格式：
+    // 1. 直接输出完整 HTML
+    // 2. ```html ... ``` 代码块包裹
+    // 3. 代码块前后带有说明文字
+    const { html, preamble } = this.extractHtmlReport(rawReport, objective);
     
-    // 如果 AI 没有返回完整 HTML，包装一下
-    if (!html.toLowerCase().includes("<!doctype") && !html.toLowerCase().includes("<html")) {
-      html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BeeSearch 研究报告 — ${objective}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #FFFDF5; color: #3D2C00; line-height: 1.7; }
-  .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
-  h1 { color: #3D2C00; border-bottom: 3px solid #FFC107; padding-bottom: 0.5rem; margin-bottom: 1rem; }
-  h2 { color: #3D2C00; border-left: 4px solid #FFC107; padding-left: 1rem; margin: 2rem 0 1rem; }
-  h3 { color: #6D5000; margin: 1.5rem 0 0.5rem; }
-  p { margin-bottom: 1rem; }
-  a { color: #E6A800; }
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #FFF0B8; color: #6D5000; font-size: 12px; margin: 2px; }
-  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-  th, td { padding: 8px 12px; border: 1px solid #FFE49A; text-align: left; }
-  th { background: #FFC107; color: #3D2C00; }
-  tr:nth-child(even) { background: #FFFDF5; }
-  .footer { text-align: center; padding: 2rem; color: #9A7100; font-size: 12px; border-top: 2px solid #FFE49A; margin-top: 3rem; }
-</style>
-</head>
-<body>
-<div class="container">
-${html}
-<div class="footer">🐝 由 BeeSearch 蜂群智能系统生成</div>
-</div>
-</body>
-</html>`;
+    // 如果有代码块外的说明文字，嵌入到 HTML 的 data 属性中供前端展示
+    if (preamble) {
+      // 把 preamble 用 base64 编码后注入到 HTML 标签上
+      // 使用兼容浏览器和 Node 的方式编码 UTF-8 → base64
+      let encodedPreamble: string;
+      if (typeof TextEncoder !== "undefined" && typeof btoa === "function") {
+        // 浏览器端：TextEncoder + btoa
+        const bytes = new TextEncoder().encode(preamble);
+        const binStr = Array.from(bytes, b => String.fromCharCode(b)).join("");
+        encodedPreamble = btoa(binStr);
+      } else {
+        // Node 端
+        encodedPreamble = Buffer.from(preamble, "utf-8").toString("base64");
+      }
+      if (html.includes("<html")) {
+        return html.replace(/<html([^>]*)>/, `<html$1 data-preamble="${encodedPreamble}">`);
+      }
+      // 如果没有 <html> 标签，在最外层 div 上加
+      return html.replace(/<body([^>]*)>/, `<body$1 data-preamble="${encodedPreamble}">`);
     }
     
     return html;
@@ -770,6 +806,128 @@ ${html}
 
     console.warn("[Hermes][extractJSON] No JSON found in text, returning raw");
     return trimmed;
+  }
+
+  /**
+   * 从 AI 输出中提取 HTML 报告
+   * 
+   * 处理多种格式：
+   * 1. 直接输出完整 HTML（以 <!DOCTYPE 或 <html 开头）
+   * 2. ```html ... ``` 代码块包裹
+   * 3. 代码块前后带有说明文字（preamble / postamble）
+   * 4. 多个 ```html 代码块（合并）
+   * 
+   * 返回 { html, preamble }:
+   * - html: 清理后的完整 HTML 文档
+   * - preamble: 代码块外的文本（如果有），可供前端展示
+   */
+  private extractHtmlReport(raw: string, objective: string): { html: string; preamble: string } {
+    const trimmed = raw.trim();
+
+    // ─── 情况 1: 直接就是完整 HTML（最理想） ───
+    if (/^<!doctype\s+html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) {
+      return { html: trimmed, preamble: "" };
+    }
+
+    // ─── 情况 2/3: 包含 ```html ... ``` 代码块 ───
+    // 支持多个代码块（取最大的那个，通常就是完整 HTML）
+    const codeBlockRegex = /```(?:html)?\s*\n([\s\S]*?)```/g;
+    const blocks: { content: string; start: number; end: number }[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = codeBlockRegex.exec(trimmed)) !== null) {
+      blocks.push({
+        content: match[1].trim(),
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+
+    if (blocks.length > 0) {
+      // 找到包含 HTML 结构的最大代码块
+      const htmlBlock = blocks
+        .filter(b => b.content.includes("<") && b.content.includes(">"))
+        .sort((a, b) => b.content.length - a.content.length)[0];
+
+      if (htmlBlock) {
+        // 提取代码块前后的文本作为 preamble
+        const beforeText = trimmed.slice(0, htmlBlock.start).trim();
+        const afterText = trimmed.slice(htmlBlock.end).trim();
+
+        // 清理 preamble 中的无用标记
+        const preambleParts: string[] = [];
+        if (beforeText) preambleParts.push(beforeText);
+        if (afterText) preambleParts.push(afterText);
+        const preamble = preambleParts
+          .join("\n\n")
+          .replace(/```\w*\s*/g, "")  // 清理残留的代码块标记
+          .trim();
+
+        let html = htmlBlock.content;
+
+        // 如果代码块内容不是完整 HTML 文档，包装它
+        if (!html.toLowerCase().includes("<!doctype") && !html.toLowerCase().includes("<html")) {
+          html = this.wrapPartialHtml(html, objective);
+        }
+
+        return { html, preamble };
+      }
+    }
+
+    // ─── 情况 4: 简单的首尾 ``` 包裹（无 html 标记） ───
+    let content = trimmed;
+    if (content.startsWith("```html")) {
+      content = content.slice(7);
+    } else if (content.startsWith("```")) {
+      content = content.slice(3);
+    }
+    if (content.endsWith("```")) {
+      content = content.slice(0, -3);
+    }
+    content = content.trim();
+
+    // ─── 情况 5: 不是标准格式，整段当内容 ───
+    if (!content.toLowerCase().includes("<!doctype") && !content.toLowerCase().includes("<html")) {
+      content = this.wrapPartialHtml(content, objective);
+    }
+
+    return { html: content, preamble: "" };
+  }
+
+  /**
+   * 将部分 HTML 内容包装为完整文档
+   */
+  private wrapPartialHtml(body: string, objective: string): string {
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BeeSearch 研究报告 — ${objective}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #FFFDF5; color: #3D2C00; line-height: 1.7; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+  h1 { color: #3D2C00; border-bottom: 3px solid #FFC107; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+  h2 { color: #3D2C00; border-left: 4px solid #FFC107; padding-left: 1rem; margin: 2rem 0 1rem; }
+  h3 { color: #6D5000; margin: 1.5rem 0 0.5rem; }
+  p { margin-bottom: 1rem; }
+  a { color: #E6A800; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #FFF0B8; color: #6D5000; font-size: 12px; margin: 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { padding: 8px 12px; border: 1px solid #FFE49A; text-align: left; }
+  th { background: #FFC107; color: #3D2C00; }
+  tr:nth-child(even) { background: #FFFDF5; }
+  .footer { text-align: center; padding: 2rem; color: #9A7100; font-size: 12px; border-top: 2px solid #FFE49A; margin-top: 3rem; }
+</style>
+</head>
+<body>
+<div class="container">
+${body}
+<div class="footer">🐝 由 BeeSearch 蜂群智能系统生成</div>
+</div>
+</body>
+</html>`;
   }
 }
 

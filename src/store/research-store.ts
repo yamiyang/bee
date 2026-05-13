@@ -22,7 +22,7 @@ import type {
   SourceConfig,
   SourceType,
 } from "@/types";
-import { flowerField, DEFAULT_SOURCES } from "@/engine/flowers";
+import { flowerField } from "@/engine/flowers";
 import { registerAllAdapters } from "@/engine/flowers/adapters";
 
 /* ---------- helpers ---------- */
@@ -43,6 +43,7 @@ function nextBeeName() {
 const DEFAULT_CONFIG: ResearchConfig = {
   maxBees: 8,
   maxSearches: 100,
+  beeTimeout: 60,               // 单只蜜蜂超时时间（秒）
   selectedSources: [],
   language: "zh-CN",
 };
@@ -62,17 +63,18 @@ interface ResearchStore {
   activeResearch: () => Research | undefined;
 
   /* --- 花田 (信息源) 管理 --- */
-  initFlowerField: () => void;
+  initFlowerField: () => Promise<void>;
   addFlowerSource: (type: SourceType, name: string, config: SourceConfig) => string;
   updateFlowerSource: (id: string, updates: Partial<FlowerSource>) => void;
   removeFlowerSource: (id: string) => void;
-  toggleFlowerSource: (id: string) => void;
+  toggleFlowerSource: (id: string) => Promise<void>;
 
   /* --- Research CRUD --- */
   createResearch: (title: string, objective: string, config?: Partial<ResearchConfig>) => string;
   deleteResearch: (id: string) => void;
   setActiveResearch: (id: string | null) => void;
   updateResearchStatus: (id: string, status: ResearchStatus) => void;
+  updateResearchMeta: (id: string, title: string, objective: string) => void;
 
   /* --- Bees --- */
   dispatchBee: (researchId: string, topic: string) => string;
@@ -117,37 +119,22 @@ export const useResearchStore = create<ResearchStore>()(
 
       // ─── 花田管理 ───
 
-      initFlowerField: () => {
-        // 注册所有适配器
+      initFlowerField: async () => {
+        // 注册所有适配器（幂等操作）
         registerAllAdapters();
 
-        const sources = get().flowerSources;
-
-        if (sources.length === 0) {
-          // 首次初始化 — 使用 DEFAULT_SOURCES，注意 type 作为 id 的前缀保证稳定
-          const defaultSources: FlowerSource[] = DEFAULT_SOURCES.map(s => ({
-            ...s,
-            id: s.type, // 用 type 作为稳定 id，方便 Hermes 引用
-            createdAt: Date.now(),
-          }));
-          set({ flowerSources: defaultSources });
-          for (const source of defaultSources) {
+        // 从后端 API 加载信息源列表
+        try {
+          const res = await fetch("/api/flowers");
+          if (!res.ok) throw new Error(`API error: ${res.status}`);
+          const { sources } = await res.json();
+          set({ flowerSources: sources });
+          // 同步到 flowerField 运行时单例
+          for (const source of sources) {
             flowerField.addSource(source);
           }
-        } else {
-          // 已有持久化数据 — 同步到 flowerField 运行时
-          // 同时确保免费源至少被激活
-          const FREE_TYPES: SourceType[] = ["arxiv", "hackernews", "reddit", "github"];
-          const updatedSources = sources.map(source => {
-            if (FREE_TYPES.includes(source.type) && source.status === "inactive") {
-              return { ...source, status: "active" as const };
-            }
-            return source;
-          });
-          set({ flowerSources: updatedSources });
-          for (const source of updatedSources) {
-            flowerField.addSource(source);
-          }
+        } catch (err) {
+          console.error("[🌸 initFlowerField] 加载信息源失败:", err);
         }
       },
 
@@ -175,10 +162,18 @@ export const useResearchStore = create<ResearchStore>()(
           flowerSources: s.flowerSources.map(f => {
             if (f.id !== id) return f;
             const updated = { ...f, ...updates };
-            flowerField.addSource(updated); // 覆盖
+            flowerField.addSource(updated); // 覆盖运行时
             return updated;
           }),
         }));
+        // 如果有 config 更新，持久化到后端
+        if (updates.config) {
+          fetch("/api/flowers", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, config: updates.config }),
+          }).catch(err => console.error("[🌸 updateFlowerSource] 同步失败:", err));
+        }
       },
 
       removeFlowerSource: (id) => {
@@ -186,12 +181,23 @@ export const useResearchStore = create<ResearchStore>()(
         set((s) => ({ flowerSources: s.flowerSources.filter(f => f.id !== id) }));
       },
 
-      toggleFlowerSource: (id) => {
+      toggleFlowerSource: async (id) => {
         const source = get().flowerSources.find(f => f.id === id);
         if (!source) return;
         const newStatus = source.status === "active" ? "inactive" : "active";
+        // 乐观更新 UI
         get().updateFlowerSource(id, { status: newStatus });
         flowerField.updateSourceStatus(id, newStatus);
+        // 持久化到后端
+        try {
+          await fetch("/api/flowers", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, status: newStatus }),
+          });
+        } catch (err) {
+          console.error("[🌸 toggleFlowerSource] 同步失败:", err);
+        }
       },
 
       // ─── Research CRUD ───
@@ -233,6 +239,13 @@ export const useResearchStore = create<ResearchStore>()(
         set((s) => ({
           researches: s.researches.map((r) =>
             r.id === id ? { ...r, status, updatedAt: Date.now() } : r
+          ),
+        })),
+
+      updateResearchMeta: (id, title, objective) =>
+        set((s) => ({
+          researches: s.researches.map((r) =>
+            r.id === id ? { ...r, title, objective, updatedAt: Date.now() } : r
           ),
         })),
 
@@ -534,11 +547,22 @@ export const useResearchStore = create<ResearchStore>()(
     }),
     {
       name: "beesearch-research-store",
-      version: 5, // v5: 知识图谱去重合并 + 蜜蜂复用机制
+      version: 8, // v8: 花田数据源改为后端 API 管理，不再持久化到 localStorage
       partialize: (state) => ({
         researches: state.researches,
-        flowerSources: state.flowerSources,
       }),
+      // ⚠️ 必须提供 migrate，否则版本不匹配时 Zustand 会丢弃全部已有数据！
+      migrate: (persistedState: unknown, _oldVersion: number) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const state = persistedState as any;
+        return {
+          researches: state?.researches ?? [],
+        };
+      },
+      onRehydrateStorage: () => () => {
+        // persist 水合完成，花田数据由 initFlowerField() API 调用加载，
+        // 这里不再做花田相关的初始化。
+      },
     }
   )
 );

@@ -145,13 +145,17 @@ class FlowerFieldRegistry {
   async searchMultiple(sourceIds: string[], query: string, options?: SearchOptions): Promise<SourceResult[]> {
     const promises = sourceIds.map(id =>
       this.search(id, query, options).catch(err => {
-        console.warn(`Search failed for source ${id}:`, err.message);
+        console.warn(`[🌸 searchMultiple] Source "${id}" failed for "${query}": ${err.message}`);
         return [] as SourceResult[];
       })
     );
 
     const results = await Promise.all(promises);
-    return results.flat();
+    const flat = results.flat();
+    if (flat.length === 0 && sourceIds.length > 0) {
+      console.warn(`[🌸 searchMultiple] All ${sourceIds.length} sources returned empty for "${query}"`);
+    }
+    return flat;
   }
 }
 
@@ -212,8 +216,8 @@ export const DEFAULT_SOURCES: Omit<FlowerSource, "id" | "createdAt">[] = [
     type: "reddit",
     name: "Reddit",
     icon: "🤖",
-    description: "Reddit — 社区讨论、深度分析、用户观点",
-    status: "active",
+    description: "Reddit — 社区讨论、深度分析、用户观点（需 OAuth 认证）",
+    status: "inactive",
     config: {},
     capabilities: ["search", "trending", "comments"],
   },
@@ -237,10 +241,10 @@ export const DEFAULT_SOURCES: Omit<FlowerSource, "id" | "createdAt">[] = [
   },
   {
     type: "web",
-    name: "Web Crawler",
+    name: "Web Search",
     icon: "🕸️",
-    description: "通用网页爬取 — 抓取任意网页内容",
-    status: "inactive",
+    description: "通用网页搜索 — DuckDuckGo（免费）/ Jina（需配 Key）",
+    status: "active",
     config: {},
     capabilities: ["search"],
   },
@@ -248,7 +252,7 @@ export const DEFAULT_SOURCES: Omit<FlowerSource, "id" | "createdAt">[] = [
     type: "rss",
     name: "RSS Feeds",
     icon: "📡",
-    description: "RSS 订阅源 — 博客、新闻站点聚合",
+    description: "RSS 订阅源 — 博客、新闻站点聚合（暂未实现）",
     status: "inactive",
     config: {},
     capabilities: ["search", "realtime"],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useResearchStore } from "@/store/research-store";
 import type { FlowerSource, SourceType } from "@/types";
@@ -9,8 +9,14 @@ export default function FlowerFieldPanel() {
   const sources = useResearchStore((s) => s.flowerSources);
   const toggleSource = useResearchStore((s) => s.toggleFlowerSource);
   const updateSource = useResearchStore((s) => s.updateFlowerSource);
+  const initFlowerField = useResearchStore((s) => s.initFlowerField);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempConfig, setTempConfig] = useState<Record<string, string>>({});
+
+  // 从后端 API 加载信息源
+  useEffect(() => {
+    initFlowerField();
+  }, [initFlowerField]);
 
   const activeCount = sources.filter(s => s.status === "active").length;
 
@@ -64,7 +70,7 @@ export default function FlowerFieldPanel() {
       {/* Footer */}
       <div className="p-3 border-t border-honey-100 bg-white">
         <p className="text-[11px] text-honey-800/40 text-center font-bold">
-          💡 arXiv、Hacker News、Reddit 无需 API Key 即可采蜜
+          💡 arXiv、Hacker News、Reddit、GitHub、Web Crawler、RSS 无需 API Key 即可采蜜
         </p>
       </div>
     </div>

@@ -19,6 +19,7 @@ export default function ResearchDetailPage() {
   const research = useResearchStore((s) => s.researches.find((r) => r.id === id));
   const addMessage = useResearchStore((s) => s.addMessage);
   const setActiveResearch = useResearchStore((s) => s.setActiveResearch);
+  const updateResearchMeta = useResearchStore((s) => s.updateResearchMeta);
   const initFlowerField = useResearchStore((s) => s.initFlowerField);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -46,6 +47,12 @@ export default function ResearchDetailPage() {
       if (!research || isProcessing) return;
       addMessage(id, { role: "user", content: text });
 
+      // First message → mark title as pending (蜂后会在 swarm 引擎中自动总结)
+      const isFirstMessage = research.messages.length === 0;
+      if (isFirstMessage) {
+        updateResearchMeta(id, "🐝 蜂后正在理解…", text);
+      }
+
       if (research.status === "idle" || research.status === "completed" || research.status === "error") {
         setIsProcessing(true);
         try {
@@ -62,7 +69,7 @@ export default function ResearchDetailPage() {
         });
       }
     },
-    [research, isProcessing, id, addMessage]
+    [research, isProcessing, id, addMessage, updateResearchMeta]
   );
 
   if (!research) {
@@ -99,11 +106,13 @@ export default function ResearchDetailPage() {
           <span className="text-2xl drop-shadow-sm">🐝</span>
           <div className="flex-1 min-w-0">
             <h1 className="font-extrabold text-base text-honey-800 truncate">
-              {research.title}
+              {research.title === "新研究" ? "🐝 新研究 — 输入你想研究的内容" : research.title}
             </h1>
-            <p className="text-xs text-honey-600/70 truncate font-medium mt-0.5">
-              {research.objective}
-            </p>
+            {research.objective !== "待确定" && (
+              <p className="text-xs text-honey-600/70 truncate font-medium mt-0.5">
+                {research.objective}
+              </p>
+            )}
           </div>
 
           {isProcessing && (

@@ -278,6 +278,7 @@ export interface Research {
 export interface ResearchConfig {
   maxBees: number;
   maxSearches: number;             // 最大搜索次数预算（AI 自主决定轮次，这是唯一硬约束）
+  beeTimeout: number;              // 单只蜜蜂超时时间（秒），超时后放弃该蜜蜂继续下一轮
   selectedSources: string[];       // 选择哪些信息源
   language: string;
 }

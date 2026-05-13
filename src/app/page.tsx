@@ -4,21 +4,18 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useResearchStore } from "@/store/research-store";
 import ResearchCard from "@/components/ResearchCard";
-import NewResearchModal from "@/components/NewResearchModal";
 import { useRouter } from "next/navigation";
 
 export default function HomePage() {
   const router = useRouter();
   const { researches, createResearch, deleteResearch, setActiveResearch, initFlowerField } = useResearchStore();
-  const [showNewModal, setShowNewModal] = useState(false);
 
   useEffect(() => {
     initFlowerField();
   }, [initFlowerField]);
 
-  function handleCreate(title: string, objective: string) {
-    const id = createResearch(title, objective);
-    setShowNewModal(false);
+  function handleCreate() {
+    const id = createResearch("新研究", "待确定");
     setActiveResearch(id);
     router.push(`/research/${id}`);
   }
@@ -63,7 +60,7 @@ export default function HomePage() {
           </div>
 
           <button
-            onClick={() => setShowNewModal(true)}
+            onClick={handleCreate}
             className="cute-btn flex items-center gap-2 px-6 py-2.5 bg-gradient-to-b from-honey-400 to-honey-500 text-white text-sm shadow-md"
           >
             ＋ 新建研究
@@ -108,7 +105,7 @@ export default function HomePage() {
             </div>
 
             <button
-              onClick={() => setShowNewModal(true)}
+              onClick={handleCreate}
               className="cute-btn px-10 py-4 bg-gradient-to-b from-honey-400 to-honey-500 text-white text-lg shadow-lg hover:shadow-xl mt-4"
             >
               🚀 开启首次研究
@@ -139,8 +136,6 @@ export default function HomePage() {
           </div>
         )}
       </main>
-
-      <NewResearchModal open={showNewModal} onClose={() => setShowNewModal(false)} onCreate={handleCreate} />
     </div>
   );
 }

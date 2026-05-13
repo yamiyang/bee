@@ -99,6 +99,20 @@ export async function runSwarmResearch(researchId: string, objective: string) {
     store().updateResearchStatus(researchId, "planning");
     msg("queen", `🐝 蜂后收到研究目标：「${objective}」\n\n正在通过 Hermes 分析目标，规划搜索策略...`);
 
+    // 确保花田信息源已从后端加载
+    if (flowerField.getActiveSources().length === 0) {
+      await store().initFlowerField();
+    }
+    // ─── 蜂后总结标题和描述（替代机械截取） ───
+    try {
+      const meta = await hermes.summarizeResearchMeta(objective);
+      store().updateResearchMeta(researchId, meta.title, meta.objective);
+      console.log(`[Swarm] Research meta: "${meta.title}" — ${meta.objective}`);
+    } catch (err) {
+      console.warn("[Swarm] Failed to summarize research meta:", err);
+      // 不阻塞主流程
+    }
+
     // 获取可用的活跃信息源
     const activeSources = flowerField.getActiveSources();
     if (activeSources.length === 0) {
@@ -217,6 +231,18 @@ export async function runSwarmResearch(researchId: string, objective: string) {
           console.error("[Swarm] Knowledge graph update error:", err);
           msg("system", `⚠️ 知识图谱构建异常: ${err instanceof Error ? err.message : "未知错误"}`);
         }
+
+        // ─── 蜂后动态更新标题和描述 ───
+        // 随着研究深入，标题和描述会越来越精准
+        if (roundNumber >= 2 && allFindings.length >= 3) {
+          try {
+            const updatedMeta = await hermes.summarizeResearchMeta(objective, allFindings);
+            store().updateResearchMeta(researchId, updatedMeta.title, updatedMeta.objective);
+            console.log(`[Swarm] Research meta updated (round ${roundNumber}): "${updatedMeta.title}"`);
+          } catch {
+            // 更新元信息失败不影响主流程
+          }
+        }
       }
 
       // ─── 检查预算 ───
@@ -313,6 +339,30 @@ export async function runSwarmResearch(researchId: string, objective: string) {
 }
 
 // ─────────────────────────────────────────────
+// 超时工具
+// ─────────────────────────────────────────────
+
+class BeeTimeoutError extends Error {
+  constructor(beeName: string, timeoutSec: number) {
+    super(`蜜蜂「${beeName}」超时 (${timeoutSec}s)`);
+    this.name = "BeeTimeoutError";
+  }
+}
+
+/**
+ * 用 Promise.race 给 promise 加上超时：
+ * 超时后 reject BeeTimeoutError，但不会取消原始 promise（JS 无法取消）
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, beeName: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new BeeTimeoutError(beeName, timeoutMs / 1000)), timeoutMs)
+    ),
+  ]);
+}
+
+// ─────────────────────────────────────────────
 // 执行一轮搜索
 // ─────────────────────────────────────────────
 
@@ -330,6 +380,10 @@ async function executeSearchRound(
   const hermes = getHermes();
   const allFindings: Finding[] = [];
 
+  // 获取超时配置（秒 → 毫秒）
+  const research = store().researches.find(r => r.id === researchId);
+  const beeTimeoutMs = (research?.config.beeTimeout || 60) * 1000;
+
   // 为每个任务派出蜜蜂（并行执行）
   const beePromises = tasks.map(async (task, index) => {
     // 检查是否被用户停止
@@ -337,15 +391,16 @@ async function executeSearchRound(
     
     // dispatchBee 内部会优先复用 resting 的蜜蜂
     const beeId = store().dispatchBee(researchId, task.query);
-    const research = store().researches.find(r => r.id === researchId);
-    const bee = research?.bees.find(b => b.id === beeId);
+    const currentResearch = store().researches.find(r => r.id === researchId);
+    const bee = currentResearch?.bees.find(b => b.id === beeId);
     const beeName = bee?.name || `蜜蜂${index + 1}`;
     const isReassigned = (bee?.findings.length || 0) > 0; // 有旧 findings 说明是复用
 
     msg("bee", `🔍 ${isReassigned ? "再次出发" : "出发"}搜索「${task.query}」...`, beeName);
     store().updateBeeStatus(researchId, beeId, "searching");
 
-    try {
+    // 将搜索+分析全过程包装在超时限制内
+    const beeWork = async () => {
       // 在花田信息源中搜索
       const allSources = flowerField.getActiveSources();
       
@@ -412,15 +467,31 @@ async function executeSearchRound(
 
       msg("bee", `✅ 分析完成：「${finding.title}」\n💡 关键洞察: ${analysis.keyInsights.slice(0, 2).join("; ")}`, beeName);
       store().updateBeeStatus(researchId, beeId, "resting");
+    };
 
+    try {
+      await withTimeout(beeWork(), beeTimeoutMs, beeName);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "未知错误";
-      msg("bee", `❌ 搜索失败: ${errorMsg}`, beeName);
-      store().updateBeeStatus(researchId, beeId, "error");
+      if (err instanceof BeeTimeoutError) {
+        msg("bee", `⏰ 超时了！蜜蜂「${beeName}」在 ${beeTimeoutMs / 1000} 秒内未完成，已放弃`, beeName);
+        store().updateBeeStatus(researchId, beeId, "error");
+        console.warn(`[Swarm] Bee "${beeName}" timed out after ${beeTimeoutMs / 1000}s on task: ${task.query}`);
+      } else {
+        const errorMsg = err instanceof Error ? err.message : "未知错误";
+        msg("bee", `❌ 搜索失败: ${errorMsg}`, beeName);
+        store().updateBeeStatus(researchId, beeId, "error");
+      }
     }
   });
 
+  // 使用 allSettled 等待所有蜜蜂（含超时的）完成
+  // 超时的蜜蜂会很快 reject，不会阻塞其他蜜蜂
   await Promise.allSettled(beePromises);
+
+  // 统计本轮成果
+  const completedCount = allFindings.length;
+  const timedOutBees = store().researches.find(r => r.id === researchId)
+    ?.bees.filter(b => b.status === "error").length || 0;
 
   // 记录轮次摘要
   store().addRoundSummary(researchId, {
@@ -433,7 +504,8 @@ async function executeSearchRound(
     nextStrategy: "由 AI 自主决定",
   });
 
-  msg("queen", `📊 第 ${round} 轮完成: ${allFindings.length} 条情报 | ${[...new Set(allFindings.flatMap(f => f.sourceResults.map(r => r.sourceName)))].length} 个信息源`);
+  const timedOutNote = timedOutBees > 0 ? ` | ⏰ ${timedOutBees} 只超时` : "";
+  msg("queen", `📊 第 ${round} 轮完成: ${completedCount} 条情报 | ${[...new Set(allFindings.flatMap(f => f.sourceResults.map(r => r.sourceName)))].length} 个信息源${timedOutNote}`);
 
   return allFindings;
 }

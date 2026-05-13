@@ -24,20 +24,24 @@ export const githubAdapter: FlowerAdapter = {
 
     const headers: Record<string, string> = {
       Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2023-11-28",
+      "X-GitHub-Api-Version": "2022-11-28",
       ...config.customHeaders,
     };
     if (config.apiKey) {
       headers.Authorization = `Bearer ${config.apiKey}`;
     }
 
-    // 同时搜索仓库和代码
-    const [repoResults, codeResults] = await Promise.all([
+    // 搜索仓库（无需 token）
+    // 代码搜索需要 GitHub token，未配置时跳过
+    const promises: Promise<SourceResult[]>[] = [
       searchRepos(baseUrl, query, headers, maxResults, options),
-      searchCode(baseUrl, query, headers, Math.ceil(maxResults / 2), options),
-    ]);
+    ];
+    if (config.apiKey) {
+      promises.push(searchCode(baseUrl, query, headers, Math.ceil(maxResults / 2), options));
+    }
+    const allResults = await Promise.all(promises);
 
-    return [...repoResults, ...codeResults].slice(0, maxResults);
+    return allResults.flat().slice(0, maxResults);
   },
 
   async validateConfig(config: SourceConfig): Promise<boolean> {
@@ -48,7 +52,7 @@ export const githubAdapter: FlowerAdapter = {
   async trending(config: SourceConfig, options?: TrendingOptions): Promise<SourceResult[]> {
     const headers: Record<string, string> = {
       Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2023-11-28",
+      "X-GitHub-Api-Version": "2022-11-28",
     };
     if (config.apiKey) {
       headers.Authorization = `Bearer ${config.apiKey}`;

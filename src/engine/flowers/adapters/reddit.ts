@@ -37,12 +37,18 @@ export const redditAdapter: FlowerAdapter = {
 
     const response = await proxyFetch(url, {
       headers: {
-        "User-Agent": "BeeSearch-Research-Bot/1.0",
+        Accept: "application/json",
         ...config.customHeaders,
       },
     });
 
-    if (!response.ok) {
+    // 检测 Reddit 的 IP 封锁（返回 HTML 而不是 JSON）
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok || contentType.includes("text/html")) {
+      const text = await response.text();
+      if (text.includes("blocked") || text.includes("Blocked")) {
+        throw new Error("Reddit IP blocked — 需要配置 Reddit API OAuth 或代理");
+      }
       throw new Error(`Reddit API error: ${response.status}`);
     }
 
@@ -85,7 +91,7 @@ export const redditAdapter: FlowerAdapter = {
 
     const url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}`;
     const response = await proxyFetch(url, {
-      headers: { "User-Agent": "BeeSearch-Research-Bot/1.0" },
+      headers: { Accept: "application/json" },
     });
 
     if (!response.ok) {

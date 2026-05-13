@@ -16,10 +16,31 @@ type Tab = "hive" | "report";
 
 /* ═══════════════════════════════════════════
    HTML 报告渲染器
+   支持展示 AI 在 HTML 代码块外写的说明文字（preamble）
    ═══════════════════════════════════════════ */
+
+/**
+ * 从报告 HTML 中提取 preamble（代码块外的说明文字）
+ * preamble 以 base64 编码存储在 <html data-preamble="..."> 或 <body data-preamble="..."> 上
+ */
+function extractPreamble(html: string): string {
+  const match = html.match(/data-preamble="([^"]+)"/);
+  if (!match) return "";
+  try {
+    // base64 → UTF-8 解码（TextDecoder 方式，不用 deprecated escape）
+    const binStr = atob(match[1]);
+    const bytes = Uint8Array.from(binStr, c => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
 function HtmlReportViewer({ html }: { html: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(600);
+  const preamble = extractPreamble(html);
+  const [showPreamble, setShowPreamble] = useState(true);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -47,6 +68,38 @@ function HtmlReportViewer({ html }: { html: string }) {
 
   return (
     <div className="h-full flex flex-col gap-3">
+      {/* Preamble 区域 — AI 在 HTML 代码块外的说明文字 */}
+      {preamble && showPreamble && (
+        <div className="flex-shrink-0 bg-gradient-to-r from-honey-50 to-amber-50 px-5 py-4 rounded-2xl border border-honey-200/70 shadow-sm relative">
+          <button
+            onClick={() => setShowPreamble(false)}
+            className="absolute top-2.5 right-3 text-honey-400 hover:text-honey-600 text-sm transition-colors"
+            title="收起"
+          >
+            ✕
+          </button>
+          <div className="flex items-start gap-3">
+            <span className="text-lg flex-shrink-0 mt-0.5">🐝</span>
+            <div className="min-w-0 pr-6">
+              <p className="text-xs font-bold text-honey-600 mb-1.5">蜂后附言</p>
+              <div className="text-sm text-honey-800 leading-relaxed whitespace-pre-wrap break-words">
+                {preamble}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 如果 preamble 被收起了，显示一个小按钮可以重新展开 */}
+      {preamble && !showPreamble && (
+        <button
+          onClick={() => setShowPreamble(true)}
+          className="flex-shrink-0 self-start text-xs text-honey-500 hover:text-honey-700 px-3 py-1 rounded-full border border-honey-200 bg-white/80 transition-colors"
+        >
+          🐝 查看蜂后附言
+        </button>
+      )}
+
       <div className="flex items-center gap-3 flex-shrink-0 bg-white px-4 py-2.5 rounded-2xl border border-honey-100 shadow-sm">
         <span className="text-sm font-bold text-honey-700 flex items-center gap-2"><span>📄</span> 研究报告</span>
         <div className="ml-auto flex gap-2">
