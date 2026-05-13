@@ -23,6 +23,8 @@ export default function ResearchDetailPage() {
   const updateResearchMeta = useResearchStore((s) => s.updateResearchMeta);
   const initFlowerField = useResearchStore((s) => s.initFlowerField);
 
+  const setReport = useResearchStore((s) => s.setReport);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [rightPanel, setRightPanel] = useState<RightPanel>("content");
 
@@ -105,8 +107,43 @@ export default function ResearchDetailPage() {
           await runSwarmResearch(id, query);
         }
 
+        // 2b. 如果蜂后调用了 generate_report skill，生成/重新生成报告
+        const reportCall = queenResult.toolCalls.find(
+          tc => tc.function?.name === "generate_report"
+        );
+
+        if (reportCall && !researchCall) {
+          let focus = "";
+          try {
+            const args = JSON.parse(reportCall.function.arguments);
+            focus = args.focus || "";
+          } catch {
+            // ignore
+          }
+
+          if (allFindings.length === 0) {
+            addMessage(id, { role: "queen", content: "🐝 蜂巢里还没有花蜜呢，我得先派蜜蜂去采集信息才能酿报告哦~" });
+          } else {
+            addMessage(id, { role: "queen", content: `📝 好的，蜂后正在重新酿造报告${focus ? `（聚焦角度：${focus}）` : ""}...请稍等 🍯` });
+            try {
+              const currentResearch = useResearchStore.getState().researches.find(r => r.id === id);
+              const report = await hermes.generateReport(
+                research.objective,
+                allFindings,
+                currentResearch?.graph || research.graph,
+                currentResearch?.roundSummaries || [],
+                focus || undefined
+              );
+              setReport(id, report);
+              addMessage(id, { role: "queen", content: "✅ **新的采蜜报告酿好啦！** 请点击右侧「采蜜报告」标签品尝 🍯" });
+            } catch (err) {
+              addMessage(id, { role: "system", content: `⚠️ 酿蜜失败: ${err instanceof Error ? err.message : "未知错误"}` });
+            }
+          }
+        }
+
         // 3. 如果蜂后既没回复也没调用 tool（异常情况），给个兜底
-        if (!queenResult.content && !researchCall) {
+        if (!queenResult.content && !researchCall && !reportCall) {
           addMessage(id, { role: "queen", content: "🐝 嗯...让我想想。你能再说详细一点吗？" });
         }
 
@@ -116,7 +153,7 @@ export default function ResearchDetailPage() {
       }
       setIsProcessing(false);
     },
-    [research, isProcessing, id, addMessage, updateResearchMeta]
+    [research, isProcessing, id, addMessage, updateResearchMeta, setReport]
   );
 
   if (!research) {

@@ -23,7 +23,7 @@
    ============================================================ */
 
 import { useResearchStore } from "@/store/research-store";
-import { getHermes } from "./hermes";
+import { getHermes, getBeeHermes } from "./hermes";
 import { flowerField } from "./flowers";
 import type { SearchTask, SourceResult, Finding } from "@/types";
 
@@ -377,7 +377,7 @@ async function executeSearchRound(
   const msg = (role: "queen" | "bee" | "system", content: string, beeName?: string) =>
     store().addMessage(researchId, { role, content, beeName });
 
-  const hermes = getHermes();
+  const beeHermes = getBeeHermes();
   const allFindings: Finding[] = [];
 
   // 获取超时配置（秒 → 毫秒）
@@ -436,8 +436,8 @@ async function executeSearchRound(
       msg("bee", `🍯 找到了 ${results.length} 滴花蜜，正在尝味道...`, beeName);
       store().updateBeeStatus(researchId, beeId, "analyzing");
 
-      // Hermes 分析结果
-      const analysis = await hermes.analyzeResults(
+      // 蜜蜂分析结果（使用快速模型）
+      const analysis = await beeHermes.analyzeResults(
         objective,
         task,
         results,

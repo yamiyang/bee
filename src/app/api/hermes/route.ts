@@ -9,8 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, tools, tool_choice, temperature, max_tokens } = body as {
+    const { messages, model, tools, tool_choice, temperature, max_tokens } = body as {
       messages: { role: string; content: string }[];
+      model?: string;
       tools?: unknown[];
       tool_choice?: string | object;
       temperature?: number;
@@ -19,10 +20,11 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_HERMES_BASE_URL || "http://localhost:11434/v1";
     const apiKey = process.env.NEXT_PUBLIC_HERMES_API_KEY || "ollama";
-    const model = process.env.NEXT_PUBLIC_HERMES_MODEL || "deepseek-chat";
+    // 优先用前端传入的 model，其次用环境变量
+    const resolvedModel = model || process.env.NEXT_PUBLIC_QUEEN_MODEL || "deepseek-v4-pro";
 
     const payload: Record<string, unknown> = {
-      model,
+      model: resolvedModel,
       messages,
       temperature: temperature ?? 0.7,
       max_tokens: max_tokens ?? 8192,
