@@ -449,7 +449,7 @@ ${knowledgeSection}
 规则：
 1. 将目标分解为 3-6 个互补的搜索方向
 2. 每个搜索方向应该有明确的搜索查询 (query)
-3. 为每个任务指定最适合的信息源
+3. ⚠️ **信息多样性原则**：必须根据可用信息源的特性进行多样化分配。避免所有任务都集中在 Web Search / DuckDuckGo 等通用引擎上。如果有特定的学术、社交媒体、代码库、RSS等垂直源，应该针对性地为它们分配相应的探查任务，以获得不同维度的信息。
 4. 解释为什么这个方向值得探索 (rationale)
 
 可用信息源: ${availableSources.join(", ")}
@@ -582,6 +582,7 @@ ${roundSummaries.length > 0 ? `历轮总结:\n${roundSummaries.map(r => `第${r.
 2. 深化高相关性但浅度覆盖的方向
 3. 探索可能被忽略的交叉领域
 4. 验证可能存在矛盾的信息
+5. ⚠️ **信息多样性原则**：如果发现以往轮次过度依赖某几个信息源（如通用搜索引擎），本轮扩展**必须刻意**分配任务给其他未充分利用的垂直信息源（如学术、社交、开源代码、RSS等），以获取更多元的视角。
 
 输出 JSON 数组:
 [
@@ -629,7 +630,7 @@ ${roundSummaries.length > 0 ? `历轮总结:\n${roundSummaries.map(r => `第${r.
     objective: string,
     currentFindings: Finding[],
     graph: { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] },
-    roundSummaries: { round: number; keyDiscoveries: string[]; gapsIdentified: string[] }[],
+    roundSummaries: { round: number; keyDiscoveries: string[]; gapsIdentified: string[]; sourcesUsed?: string[] }[],
     availableSources: string[],
     usedSearches: number,
     maxSearches: number
@@ -679,7 +680,7 @@ ${graphNodesDigest}
 ${contradictionsDigest}
 
 ## 各轮回顾
-${roundSummaries.map(r => `第${r.round}轮: 发现=[${r.keyDiscoveries.join("; ")}] 空白=[${r.gapsIdentified.join("; ") || "未识别"}]`).join("\n") || "暂无"}
+${roundSummaries.map(r => `第${r.round}轮: 使用源=[${(r.sourcesUsed || []).join(", ")}] 发现=[${r.keyDiscoveries.join("; ")}] 空白=[${r.gapsIdentified.join("; ") || "未识别"}]`).join("\n") || "暂无"}
 
 ## 停止条件（必须同时满足以下大部分条件才能停止）
 1. 已经完成至少 3 轮搜索
@@ -687,6 +688,9 @@ ${roundSummaries.map(r => `第${r.round}轮: 发现=[${r.keyDiscoveries.join("; 
 3. 最近 2 轮的新情报与已有情报大量重复（边际收益递减）
 4. 没有明显的知识空白或未验证矛盾
 5. 研究目标的各主要方面都有覆盖
+
+## 任务生成规则（如果继续搜索）
+⚠️ **信息多样性原则**：必须有意识地引导蜜蜂前往不同类型的"花田"。请检查《各轮回顾》中使用过的信息源，如果发现过度集中在 Web Search 等通用搜索引擎，请在新任务中强制指定以前较少使用的垂直信息源（如学术、社交、开源代码、RSS等）进行互补搜索。
 
 ## 输出格式
 输出严格 JSON（不要包裹在代码块中）:
