@@ -12,7 +12,7 @@ interface ChatPanelProps {
 }
 
 const roleConfig = {
-  user: { emoji: "👤", label: "你", bubbleClass: "chat-bubble-user ml-auto" },
+  user: { emoji: "🧑‍💻", label: "勇者", bubbleClass: "chat-bubble-user ml-auto" },
   queen: { emoji: "👑", label: "蜂后", bubbleClass: "chat-bubble-agent" },
   bee: { emoji: "🐝", label: "蜜蜂", bubbleClass: "chat-bubble-agent" },
   system: { emoji: "⚙️", label: "系统", bubbleClass: "chat-bubble-agent opacity-70" },
@@ -23,7 +23,6 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
@@ -45,14 +44,17 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-bee-dark/40 gap-3">
-            <span className="text-5xl animate-bee-float">🐝</span>
-            <p className="text-sm text-center leading-relaxed">
-              输入研究目标<br />蜂群将为你采集情报
-            </p>
+            <span className="text-4xl">🐝</span>
+            <div className="pixel-card p-4 text-center">
+              <p className="text-sm leading-relaxed">
+                输入研究目标<br />
+                蜂群将为你采集情报
+              </p>
+            </div>
           </div>
         )}
 
@@ -64,23 +66,23 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
             return (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={`flex gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
               >
                 {/* Avatar */}
-                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-honey-100 flex items-center justify-center text-sm border border-honey-200">
+                <div className="flex-shrink-0 w-8 h-8 pixel-border-sm bg-honey-100 flex items-center justify-center text-base">
                   {config.emoji}
                 </div>
 
                 {/* Bubble */}
                 <div className={`max-w-[85%] ${isUser ? "text-right" : ""}`}>
                   {!isUser && (
-                    <div className="text-[10px] text-bee-dark/50 mb-0.5 px-1">
+                    <div className="text-[10px] text-bee-dark/50 mb-0.5 px-1 font-bold">
                       {msg.beeName ? `🐝 ${msg.beeName}` : config.label}
                     </div>
                   )}
-                  <div className={`${config.bubbleClass} px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap`}>
+                  <div className={`${config.bubbleClass} px-3 py-2.5 text-sm leading-relaxed whitespace-pre-wrap`}>
                     {msg.content}
                   </div>
                   <div className="text-[9px] text-bee-dark/30 mt-0.5 px-1">
@@ -100,38 +102,39 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
             className="flex items-center gap-2 px-2"
           >
             <span className="text-sm">👑</span>
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
-                  className="w-2 h-2 rounded-full bg-honey-400"
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+                  className="w-2 h-2 bg-honey-400 border border-honey-600"
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.12 }}
                 />
               ))}
             </div>
-            <span className="text-xs text-bee-dark/40">蜂群工作中...</span>
+            <span className="text-[10px] text-bee-dark/50">蜂群工作中...</span>
           </motion.div>
         )}
 
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
-      <div className="p-3 border-t-2 border-honey-200 bg-white/60 backdrop-blur-sm">
+      {/* Input */}
+      <div className="p-3 border-t-3 border-bee-dark bg-honey-100">
         <div className="flex gap-2 items-end">
+          <span className="text-xs text-bee-dark/60 pb-2.5">▶</span>
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isProcessing ? "蜂群工作中，请稍候..." : "输入研究目标，如「AI Agent 行业调研」"}
+            placeholder={isProcessing ? "蜂群工作中，请稍候..." : "输入研究目标..."}
             disabled={isProcessing}
             rows={1}
-            className="flex-1 resize-none rounded-xl border-2 border-honey-200 bg-white px-3.5 py-2.5 text-sm
-              placeholder:text-bee-dark/30 focus:outline-none focus:border-honey-400
-              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            style={{ minHeight: 42, maxHeight: 120 }}
+            className="flex-1 resize-none pixel-border-sm bg-white px-3 py-2 text-sm
+              placeholder:text-bee-dark/30 focus:outline-none focus:border-honey-500
+              disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ minHeight: 40, maxHeight: 120 }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
               target.style.height = "auto";
@@ -141,28 +144,19 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
           {isProcessing && onStop ? (
             <button
               onClick={onStop}
-              className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-500 hover:bg-red-600
-                text-white flex items-center justify-center transition-all
-                active:scale-95 shadow-md shadow-red-500/20"
+              className="pixel-btn flex-shrink-0 w-10 h-10 bg-red-500 text-white flex items-center justify-center"
               title="停止研究"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="5" y="5" width="14" height="14" rx="2" />
-              </svg>
+              ■
             </button>
           ) : (
             <button
               onClick={handleSubmit}
               disabled={!input.trim() || isProcessing}
-              className="flex-shrink-0 w-10 h-10 rounded-xl bg-honey-500 hover:bg-honey-600
-                text-white flex items-center justify-center transition-all
-                disabled:opacity-30 disabled:cursor-not-allowed active:scale-95
-                shadow-md shadow-honey-500/20"
+              className="pixel-btn flex-shrink-0 w-10 h-10 bg-honey-400 text-bee-dark flex items-center justify-center
+                disabled:opacity-30 disabled:cursor-not-allowed font-bold"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 2L11 13" />
-                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-              </svg>
+              ▶
             </button>
           )}
         </div>

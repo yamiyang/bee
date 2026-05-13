@@ -12,7 +12,6 @@ export default function HomePage() {
   const { researches, createResearch, deleteResearch, setActiveResearch, initFlowerField } = useResearchStore();
   const [showNewModal, setShowNewModal] = useState(false);
 
-  // 初始化花田信息源系统
   useEffect(() => {
     initFlowerField();
   }, [initFlowerField]);
@@ -37,87 +36,76 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-honey-50">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b-2 border-honey-200">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-honey-50 relative">
+      {/* Header Bar */}
+      <header className="sticky top-0 z-30 game-hud">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <motion.div
-              className="text-3xl"
-              animate={{ y: [0, -4, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              🐝
-            </motion.div>
+            <span className="text-2xl">🐝</span>
             <div>
-              <h1 className="font-bold text-xl text-bee-dark tracking-tight">Argus</h1>
-              <p className="text-[11px] text-bee-dark/40 -mt-0.5">AI 蜂群搜索引擎 · Powered by Hermes</p>
+              <h1 className="font-bold text-base text-honey-300 tracking-wider">
+                ARGUS
+              </h1>
+              <p className="text-[10px] text-honey-500/70">
+                AI Swarm Search Engine
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-[11px] text-honey-400">
+            <span>🍯 研究: {researches.length}</span>
+            <span>🐝 蜂群: {researches.reduce((a, r) => a + r.bees.length, 0)}</span>
           </div>
 
           <button
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-honey-500 text-white text-sm font-medium
-              hover:bg-honey-600 transition-all shadow-md shadow-honey-500/20 active:scale-95"
+            className="pixel-btn flex items-center gap-2 px-5 py-2 bg-honey-500 text-bee-dark text-sm font-bold"
           >
-            <span className="text-base">+</span>
-            新建研究
+            ＋ 新建研究
           </button>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      {/* Main */}
+      <main className="max-w-5xl mx-auto px-6 py-8 relative z-10">
         {researches.length === 0 ? (
-          /* Empty state */
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-24 gap-4"
+            className="flex flex-col items-center justify-center py-20 gap-6"
           >
-            <motion.div
-              className="text-7xl"
-              animate={{
-                y: [0, -10, 0],
-                rotate: [0, 5, -5, 0],
-              }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              🐝
-            </motion.div>
-            <h2 className="text-xl font-bold text-bee-dark">欢迎来到 Argus</h2>
-            <p className="text-sm text-bee-dark/50 text-center max-w-md leading-relaxed">
-              派出你的 AI 蜂群，通过真实信息源（Google、Twitter、GitHub、arXiv...）<br />
-              采集情报、构建知识图谱、生成深度研究报告。
-            </p>
+            <span className="text-6xl">🐝</span>
+
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-bee-dark mb-2">
+                欢迎来到 ARGUS
+              </h2>
+              <p className="text-sm text-bee-dark/50">
+                ━━━ AI 蜂群情报搜索引擎 ━━━
+              </p>
+            </div>
+
+            <div className="pixel-card p-5 text-sm text-bee-dark/60 text-center leading-relaxed max-w-md">
+              🍯 派出 AI 蜜蜂军团采集情报<br />
+              ⬡ 构建蜂巢知识图谱<br />
+              📜 生成深度研究报告
+            </div>
+
             <button
               onClick={() => setShowNewModal(true)}
-              className="mt-4 flex items-center gap-2 px-6 py-3 rounded-2xl bg-honey-500 text-white font-medium
-                hover:bg-honey-600 transition-all shadow-lg shadow-honey-500/20 active:scale-95"
+              className="pixel-btn px-8 py-3 bg-honey-400 text-bee-dark font-bold text-base"
             >
-              🍯 开始第一个研究
+              🎮 开始研究
             </button>
-
-            {/* Decorative hexagons */}
-            <div className="flex gap-2 mt-8 opacity-20">
-              {[40, 55, 40, 55, 40].map((size, i) => (
-                <motion.div
-                  key={i}
-                  className="clip-hexagon bg-honey-300"
-                  style={{ width: size, height: size * 1.15 }}
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 + i * 0.1 }}
-                />
-              ))}
-            </div>
           </motion.div>
         ) : (
-          /* Research list */
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-bee-dark">
-                我的研究 <span className="text-honey-500 font-normal text-sm ml-1">({researches.length})</span>
+              <h2 className="text-base font-bold text-bee-dark flex items-center gap-2">
+                📦 我的研究任务
+                <span className="pixel-tag border-honey-500 text-honey-600 bg-honey-100 text-[10px]">
+                  {researches.length}
+                </span>
               </h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
