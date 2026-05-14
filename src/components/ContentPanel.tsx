@@ -80,7 +80,7 @@ function HtmlReportViewer({ html }: { html: string }) {
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="px-3 py-1.5 text-xs font-bold rounded-full bg-black/20 text-white/80 hover:bg-black/40 backdrop-blur-md border border-white/10 transition-all"
+          className="px-3 py-1.5 text-xs font-bold rounded-full bg-white/50 text-amber-800/80 hover:bg-white/70 backdrop-blur-md border border-amber-200/40 transition-all"
         >
           ⬇️ 下载
         </button>
@@ -90,7 +90,7 @@ function HtmlReportViewer({ html }: { html: string }) {
             const url = URL.createObjectURL(blob);
             window.open(url, "_blank");
           }}
-          className="px-3 py-1.5 text-xs font-bold rounded-full bg-black/20 text-white/80 hover:bg-black/40 backdrop-blur-md border border-white/10 transition-all"
+          className="px-3 py-1.5 text-xs font-bold rounded-full bg-white/50 text-amber-800/80 hover:bg-white/70 backdrop-blur-md border border-amber-200/40 transition-all"
         >
           🔗 全屏
         </button>
@@ -144,10 +144,10 @@ export default function ContentPanel({ bees, graph, report, status }: ContentPan
           ? "absolute top-0 left-0 right-0 bg-transparent"
           : "border-b-2 border-honey-100/50 bg-white/30 backdrop-blur-sm"
       }`}>
-        <div className={`flex p-1 rounded-full border shadow-sm transition-all ${
+        <div className={`flex p-1 rounded-full border shadow-sm transition-all backdrop-blur-md ${
           isReportMode
-            ? "bg-black/20 border-white/10 backdrop-blur-md"
-            : "bg-honey-100/50 border-white"
+            ? "bg-white/50 border-amber-200/40"
+            : "bg-amber-100/60 border-amber-200/50"
         }`}>
           {tabs.map((tab) => (
             <button
@@ -156,21 +156,21 @@ export default function ContentPanel({ bees, graph, report, status }: ContentPan
               className={`px-5 py-1.5 text-xs font-bold transition-all rounded-full flex items-center gap-1.5 ${
                 activeTab === tab.id
                   ? isReportMode
-                    ? "bg-white/20 text-white shadow-sm border border-white/20"
-                    : "bg-white text-honey-700 shadow-sm border border-honey-200"
+                    ? "bg-amber-100/80 text-amber-900 shadow-sm border border-amber-300/50"
+                    : "bg-white text-amber-800 shadow-sm border border-amber-200"
                   : tab.enabled
                   ? isReportMode
-                    ? "text-white/60 hover:text-white border border-transparent"
-                    : "text-honey-600/70 hover:text-honey-800 border border-transparent"
+                    ? "text-amber-800/60 hover:text-amber-900 border border-transparent"
+                    : "text-amber-700/70 hover:text-amber-900 border border-transparent"
                   : isReportMode
-                  ? "text-white/20 cursor-not-allowed border border-transparent"
-                  : "text-honey-800/30 cursor-not-allowed border border-transparent"
+                  ? "text-amber-800/25 cursor-not-allowed border border-transparent"
+                  : "text-amber-700/30 cursor-not-allowed border border-transparent"
               }`}
             >
               <span className="text-base">{tab.emoji}</span> <span>{tab.label}</span>
               {tab.id === "hive" && (bees.length > 0 || graph.nodes.length > 0) && (
                 <span className={`ml-1 text-[10px] px-1.5 rounded-full ${
-                  isReportMode ? "bg-white/10 text-white/70" : "bg-honey-100 text-honey-700"
+                  isReportMode ? "bg-amber-200/50 text-amber-800/70" : "bg-amber-200/60 text-amber-800"
                 }`}>
                   {bees.filter((b) => b.status !== "retired").length}🐝 {graph.nodes.length}⬡
                 </span>
