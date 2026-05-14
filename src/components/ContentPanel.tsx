@@ -67,77 +67,58 @@ function HtmlReportViewer({ html }: { html: string }) {
   }, [html]);
 
   return (
-    <div className="h-full flex flex-col gap-3">
-      {/* Preamble 区域 — AI 在 HTML 代码块外的说明文字 */}
+    <div className="h-full flex flex-col">
+      {/* 操作栏 — 悬浮在右上角 */}
+      <div className="absolute top-3 right-4 z-30 flex gap-2">
+        <button
+          onClick={() => {
+            const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "honeycomb-honey-report.html";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="px-3 py-1.5 text-xs font-bold rounded-full bg-black/20 text-white/80 hover:bg-black/40 backdrop-blur-md border border-white/10 transition-all"
+        >
+          ⬇️ 下载
+        </button>
+        <button
+          onClick={() => {
+            const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            window.open(url, "_blank");
+          }}
+          className="px-3 py-1.5 text-xs font-bold rounded-full bg-black/20 text-white/80 hover:bg-black/40 backdrop-blur-md border border-white/10 transition-all"
+        >
+          🔗 全屏
+        </button>
+      </div>
+
+      {/* Preamble — 浮动在顶部 */}
       {preamble && showPreamble && (
-        <div className="flex-shrink-0 bg-gradient-to-r from-honey-50 to-amber-50 px-5 py-4 rounded-2xl border border-honey-200/70 shadow-sm relative">
+        <div className="absolute top-12 left-4 right-4 z-20 bg-black/60 backdrop-blur-md px-5 py-3 rounded-xl border border-white/10">
           <button
             onClick={() => setShowPreamble(false)}
-            className="absolute top-2.5 right-3 text-honey-400 hover:text-honey-600 text-sm transition-colors"
-            title="收起"
-          >
-            ✕
-          </button>
+            className="absolute top-2 right-3 text-white/40 hover:text-white text-sm"
+          >✕</button>
           <div className="flex items-start gap-3">
-            <span className="text-lg flex-shrink-0 mt-0.5">🐝</span>
-            <div className="min-w-0 pr-6">
-              <p className="text-xs font-bold text-honey-600 mb-1.5">蜂后附言</p>
-              <div className="text-sm text-honey-800 leading-relaxed whitespace-pre-wrap break-words">
-                {preamble}
-              </div>
-            </div>
+            <span className="text-lg">🐝</span>
+            <div className="text-xs text-white/80 leading-relaxed whitespace-pre-wrap">{preamble}</div>
           </div>
         </div>
       )}
 
-      {/* 如果 preamble 被收起了，显示一个小按钮可以重新展开 */}
-      {preamble && !showPreamble && (
-        <button
-          onClick={() => setShowPreamble(true)}
-          className="flex-shrink-0 self-start text-xs text-honey-500 hover:text-honey-700 px-3 py-1 rounded-full border border-honey-200 bg-white/80 transition-colors"
-        >
-          🐝 查看蜂后附言
-        </button>
-      )}
-
-      <div className="flex items-center gap-3 flex-shrink-0 bg-white px-4 py-2.5 rounded-2xl border border-honey-100 shadow-sm">
-        <span className="text-sm font-bold text-honey-700 flex items-center gap-2"><span>📄</span> 采蜜报告</span>
-        <div className="ml-auto flex gap-2">
-          <button
-            onClick={() => {
-              const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "honeycomb-honey-report.html";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            className="cute-btn px-4 py-1.5 bg-honey-50 hover:bg-honey-100 text-honey-800 text-xs border border-honey-200"
-          >
-            ⬇️ 抱回家
-          </button>
-          <button
-            onClick={() => {
-              const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-              const url = URL.createObjectURL(blob);
-              window.open(url, "_blank");
-            }}
-            className="cute-btn px-4 py-1.5 bg-honey-50 hover:bg-honey-100 text-honey-800 text-xs border border-honey-200"
-          >
-            🔗 大屏看
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 report-frame overflow-hidden">
-        <iframe
-          ref={iframeRef}
-          srcDoc={html}
-          sandbox="allow-same-origin allow-popups allow-scripts"
-          className="w-full h-full bg-white rounded-[22px]"
-          title="采蜜报告"
-        />
-      </div>
+      {/* iframe — 完全顶满 */}
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        sandbox="allow-same-origin allow-popups allow-scripts"
+        className="w-full h-full flex-1"
+        style={{ border: "none" }}
+        title="采蜜报告"
+      />
     </div>
   );
 }
@@ -153,26 +134,44 @@ export default function ContentPanel({ bees, graph, report, status }: ContentPan
     { id: "report", label: "报告", emoji: "📜", enabled: !!report },
   ];
 
+  const isReportMode = activeTab === "report";
+
   return (
-    <div className="h-full flex flex-col font-sans">
-      {/* Tab bar */}
-      <div className="flex items-center gap-2 px-4 pt-4 pb-2 border-b-2 border-honey-100/50 bg-white/30 backdrop-blur-sm z-10">
-        <div className="flex bg-honey-100/50 p-1 rounded-full border-2 border-white shadow-sm">
+    <div className="h-full flex flex-col font-sans relative">
+      {/* Tab bar — 报告模式下透明悬浮 */}
+      <div className={`flex items-center gap-2 px-4 pt-3 pb-2 z-20 transition-all ${
+        isReportMode
+          ? "absolute top-0 left-0 right-0 bg-transparent"
+          : "border-b-2 border-honey-100/50 bg-white/30 backdrop-blur-sm"
+      }`}>
+        <div className={`flex p-1 rounded-full border shadow-sm transition-all ${
+          isReportMode
+            ? "bg-black/20 border-white/10 backdrop-blur-md"
+            : "bg-honey-100/50 border-white"
+        }`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => tab.enabled && setActiveTab(tab.id)}
               className={`px-5 py-1.5 text-xs font-bold transition-all rounded-full flex items-center gap-1.5 ${
                 activeTab === tab.id
-                  ? "bg-white text-honey-700 shadow-sm border border-honey-200"
+                  ? isReportMode
+                    ? "bg-white/20 text-white shadow-sm border border-white/20"
+                    : "bg-white text-honey-700 shadow-sm border border-honey-200"
                   : tab.enabled
-                  ? "text-honey-600/70 hover:text-honey-800 border border-transparent"
+                  ? isReportMode
+                    ? "text-white/60 hover:text-white border border-transparent"
+                    : "text-honey-600/70 hover:text-honey-800 border border-transparent"
+                  : isReportMode
+                  ? "text-white/20 cursor-not-allowed border border-transparent"
                   : "text-honey-800/30 cursor-not-allowed border border-transparent"
               }`}
             >
               <span className="text-base">{tab.emoji}</span> <span>{tab.label}</span>
               {tab.id === "hive" && (bees.length > 0 || graph.nodes.length > 0) && (
-                <span className="ml-1 text-[10px] bg-honey-100 px-1.5 rounded-full text-honey-700">
+                <span className={`ml-1 text-[10px] px-1.5 rounded-full ${
+                  isReportMode ? "bg-white/10 text-white/70" : "bg-honey-100 text-honey-700"
+                }`}>
                   {bees.filter((b) => b.status !== "retired").length}🐝 {graph.nodes.length}⬡
                 </span>
               )}
@@ -188,31 +187,33 @@ export default function ContentPanel({ bees, graph, report, status }: ContentPan
         </div>
 
         {/* Status badge */}
-        <div className="ml-auto bg-white px-3 py-1.5 rounded-full border border-honey-100 shadow-sm text-[11px] font-bold flex items-center gap-2 text-honey-700">
-          {(status === "searching" || status === "planning" || status === "expanding") && (
-            <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-              🟡
-            </motion.span>
-          )}
-          {status === "completed" && <span>⭐</span>}
-          {status === "reporting" && <span>📝</span>}
-          {status === "error" && <span>💥</span>}
-          <span>
-            {status === "idle" && "待命"}
-            {status === "planning" && "找方向"}
-            {status === "searching" && "采蜜中"}
-            {status === "analyzing" && "尝味道"}
-            {status === "expanding" && "找更多花"}
-            {status === "reporting" && "酿蜜中"}
-            {status === "completed" && "完成!"}
-            {status === "paused" && "暂停"}
-            {status === "error" && "出错"}
-          </span>
-        </div>
+        {!isReportMode && (
+          <div className="ml-auto bg-white px-3 py-1.5 rounded-full border border-honey-100 shadow-sm text-[11px] font-bold flex items-center gap-2 text-honey-700">
+            {(status === "searching" || status === "planning" || status === "expanding") && (
+              <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                🟡
+              </motion.span>
+            )}
+            {status === "completed" && <span>⭐</span>}
+            {status === "reporting" && <span>📝</span>}
+            {status === "error" && <span>💥</span>}
+            <span>
+              {status === "idle" && "待命"}
+              {status === "planning" && "找方向"}
+              {status === "searching" && "采蜜中"}
+              {status === "analyzing" && "尝味道"}
+              {status === "expanding" && "找更多花"}
+              {status === "reporting" && "酿蜜中"}
+              {status === "completed" && "完成!"}
+              {status === "paused" && "暂停"}
+              {status === "error" && "出错"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 overflow-hidden relative">
+      <div className={`flex-1 overflow-hidden relative ${isReportMode ? "" : "p-4 pt-2"}`}>
         <AnimatePresence mode="wait">
           {activeTab === "hive" && (
             <motion.div
