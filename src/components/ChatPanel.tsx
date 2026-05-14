@@ -21,6 +21,7 @@ const roleConfig = {
 
 export default function ChatPanel({ messages, onSend, onStop, isProcessing }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -38,6 +39,8 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // 中文输入法正在组字时，不拦截 Enter
+    if (isComposing) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -79,7 +82,7 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
                 </div>
 
                 {/* Bubble */}
-                <div className={`max-w-[80%] ${isUser ? "text-right" : ""}`}>
+                <div className={`max-w-[80%]`}>
                   {!isUser && (
                     <div className="text-[11px] text-bee-dark/40 mb-1 px-2 font-bold flex items-center gap-1">
                       {msg.beeName ? <><span className="text-honey-500">🐝</span> {msg.beeName}</> : config.label}
@@ -135,6 +138,8 @@ export default function ChatPanel({ messages, onSend, onStop, isProcessing }: Ch
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
             placeholder={isProcessing ? "蜂群采蜜中，请稍候..." : "输入你想寻找的花蜜线索..."}
             disabled={isProcessing}
             rows={1}
